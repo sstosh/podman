@@ -46,6 +46,12 @@ type ManifestAnnotateOptions struct {
 	Variant string `json:"variant" schema:"variant"`
 }
 
+// ManifestInspectOptions provides the model for inspecting a manifest
+type ManifestInspectOptions struct {
+	// Format - change the output to JSON or a Go template.
+	Format string `json:",omitempty"`
+}
+
 // ManifestModifyOptions provides the model for mutating a manifest
 //
 // swagger 2.0 does not support oneOf for schema validation.

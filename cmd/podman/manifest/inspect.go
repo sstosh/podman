@@ -5,6 +5,7 @@ import (
 
 	"github.com/containers/podman/v4/cmd/podman/common"
 	"github.com/containers/podman/v4/cmd/podman/registry"
+	inspectTypes "github.com/containers/podman/v4/pkg/inspect"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,7 @@ var (
 		Example:           "podman manifest inspect localhost/list",
 		Args:              cobra.ExactArgs(1),
 	}
+	inspectOpts *entities.ManifestInspectOptions
 )
 
 func init() {
@@ -25,6 +27,12 @@ func init() {
 		Command: inspectCmd,
 		Parent:  manifestCmd,
 	})
+	inspectOpts = new(entities.ManifestInspectOptions)
+	flags := inspectCmd.Flags()
+
+	formatFlagName := "format"
+	flags.StringVarP(&inspectOpts.Format, formatFlagName, "f", "json", "Format the output to a Go template or json")
+	_ = inspectCmd.RegisterFlagCompletionFunc(formatFlagName, common.AutocompleteFormat(&inspectTypes.ImageData{}))
 }
 
 func inspect(cmd *cobra.Command, args []string) error {
