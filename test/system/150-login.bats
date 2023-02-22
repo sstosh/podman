@@ -70,8 +70,13 @@ function setup() {
         openssl req -newkey rsa:4096 -nodes -sha256 \
                 -keyout $AUTHDIR/domain.key -x509 -days 2 \
                 -out $AUTHDIR/domain.crt \
-                -subj "/C=US/ST=Foo/L=Bar/O=Red Hat, Inc./CN=localhost"
+                -subj "/C=US/ST=Foo/L=Bar/O=Red Hat, Inc./CN=localhost" \
+                -addext "subjectAltName=DNS:localhost"
     fi
+
+    # Copy a cert to another directory for --cert-dir option tests
+    mkdir -p ${PODMAN_SEARCH_WORKDIR}/client-auth
+    cp $CERT ${PODMAN_SEARCH_WORKDIR}/client-auth
 
     # Store credentials where container will see them
     if [ ! -e $AUTHDIR/htpasswd ]; then
@@ -185,7 +190,7 @@ EOF
        "auth error on push"
 }
 
-@test "podman push ok" {
+@test "podman push and search ok" {
     # Preserve image ID for later comparison against push/pulled image
     run_podman inspect --format '{{.Id}}' $IMAGE
     iid=$output
@@ -197,8 +202,61 @@ EOF
                --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
                $IMAGE localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
 
+    # Search a pushed image
+    run_podman search --tls-verify=false \
+               --format "table {{.Name}}" \
+               --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
+               localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+    is "${lines[1]}" "localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname" "search output is destname"
+
     # Yay! Pull it back
     run_podman pull --tls-verify=false \
+               --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
+               localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+
+    # Compare to original image
+    run_podman inspect --format '{{.Id}}' $destname
+    is "$output" "$iid" "Image ID of pulled image == original IID"
+
+    run_podman rmi $destname
+}
+
+@test "podman push and search ok with --tls-verify=true" {
+    # Preserve image ID for later comparison against push/pulled image
+    run_podman inspect --format '{{.Id}}' $IMAGE
+    iid=$output
+
+    destname=ok-$(random_string 10 | tr A-Z a-z)-ok
+    # Use command-line credentials
+    run_podman push --tls-verify=true \
+               --format docker \
+               --cert-dir ${PODMAN_SEARCH_WORKDIR}/client-auth \
+               --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
+               $IMAGE localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+
+    # Search a pushed image without --cert-dir will be failed
+    run_podman 125 search --tls-verify=true \
+               --format "table {{.Name}}" \
+               --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
+               localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+
+    # Search a pushed image without --certs will be failed
+    run_podman 125 search --tls-verify=true \
+               --format "table {{.Name}}" \
+               --cert-dir ${PODMAN_SEARCH_WORKDIR}/client-auth \
+               localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+
+    # Search a pushed image will be successed
+    run_podman search --tls-verify=true \
+               --format "table {{.Name}}" \
+               --cert-dir ${PODMAN_SEARCH_WORKDIR}/client-auth \
+               --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
+               localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
+    is "${lines[1]}" "localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname" "search output is destname"
+
+    # Yay! Pull it back
+    run_podman pull --tls-verify=true \
+               --cert-dir ${PODMAN_SEARCH_WORKDIR}/client-auth \
                --creds ${PODMAN_LOGIN_USER}:${PODMAN_LOGIN_PASS} \
                localhost:${PODMAN_LOGIN_REGISTRY_PORT}/$destname
 

@@ -1014,8 +1014,12 @@ func (s *APIServer) registerImagesHandlers(r *mux.Router) error {
 	//     type: boolean
 	//     default: false
 	//   - in: query
-	//     name: credentials
-	//     description: "username:password for the registry"
+	//     name: password
+	//     description: "password for the registry"
+	//     type: string
+	//   - in: query
+	//     name: username
+	//     description: "username for the registry"
 	//     type: string
 	//   - in: query
 	//     name: Arch
@@ -1100,6 +1104,14 @@ func (s *APIServer) registerImagesHandlers(r *mux.Router) error {
 	// summary: Search images
 	// description: Search registries for images
 	// parameters:
+	//  - in: query
+	//    name: password
+	//    description: "password for the registry"
+	//    type: string
+	//  - in: query
+	//    name: username
+	//    description: "username for the registry"
+	//    type: string
 	//  - in: query
 	//    name: term
 	//    type: string

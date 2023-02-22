@@ -175,6 +175,10 @@ type SearchOptions struct {
 	SkipTLSVerify *bool `schema:"-"`
 	// ListTags search the available tags of the repository
 	ListTags *bool
+	// Username for authenticating against the registry.
+	Username *string
+	// Password for authenticating against the registry.
+	Password *string
 }
 
 // PullOptions are optional options for pulling images

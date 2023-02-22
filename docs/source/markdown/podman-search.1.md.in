@@ -32,6 +32,10 @@ Further note that searching without a search term will only work for registries 
 
 @@option authfile
 
+@@option cert-dir
+
+@@option creds
+
 #### **--compatible**
 
 After the name and the description, also show the stars, official and automated descriptors as Docker does.

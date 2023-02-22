@@ -34,12 +34,18 @@ func SearchImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, authfile, err := auth.GetCredentials(r)
+	authconf, authfile, err := auth.GetCredentials(r)
 	if err != nil {
 		utils.Error(w, http.StatusBadRequest, err)
 		return
 	}
 	defer auth.RemoveAuthfile(authfile)
+
+	var username, password string
+	if authconf != nil {
+	        username = authconf.Username
+	        password = authconf.Password
+	}
 
 	filters := []string{}
 	for key, val := range query.Filters {
@@ -50,6 +56,8 @@ func SearchImages(w http.ResponseWriter, r *http.Request) {
 		Authfile: authfile,
 		Limit:    query.Limit,
 		ListTags: query.ListTags,
+		Password: password,
+		Username: username,
 		Filters:  filters,
 	}
 	if _, found := r.URL.Query()["tlsVerify"]; found {
