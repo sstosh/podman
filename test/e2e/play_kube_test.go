@@ -4580,6 +4580,15 @@ ENV OPENJ9_JAVA_OPTIONS=%q
 		Expect(usernsInCtr).Should(Exit(0))
 		Expect(string(usernsInCtr.Out.Contents())).To(Not(Equal(string(initialUsernsConfig))))
 
+		kube = podmanTest.PodmanNoCache([]string{"play", "kube", "--replace", "--userns=keep-id", kubeYaml})
+		kube.WaitWithDefaultTimeout()
+		Expect(kube).Should(Exit(0))
+
+		usernsInCtr = podmanTest.Podman([]string{"exec", getCtrNameInPod(pod), "cat", "/proc/self/uid_map"})
+		usernsInCtr.WaitWithDefaultTimeout()
+		Expect(usernsInCtr).Should(Exit(0))
+		Expect(string(usernsInCtr.Out.Contents())).To(Not(Equal(string(initialUsernsConfig))))
+
 		// Now try with hostUsers in the pod spec
 		for _, hostUsers := range []bool{true, false} {
 			pod = getPod(withHostUsers(hostUsers))
