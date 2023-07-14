@@ -195,7 +195,7 @@ func add(cmd *cobra.Command, args []string) error {
 	} else {
 		cfg.Engine.ServiceDestinations[args[0]] = dst
 	}
-	return cfg.Write()
+	return cfg.WriteConnection()
 }
 
 func create(cmd *cobra.Command, args []string) error {

@@ -29,6 +29,11 @@ const (
 	_configPath = "containers/containers.conf"
 	// UserOverrideContainersConfig holds the containers config path overridden by the rootless user
 	UserOverrideContainersConfig = ".config/" + _configPath
+	// _connectionPath is the path to the containers/connections.conf
+	// inside a given config directory.
+	_connectionPath = "containers/connections.conf"
+	// UserOverrideContainersConnection holds the containers connection path overridden by the rootless user
+	UserOverrideContainersConnection = ".config/" + _connectionPath
 	// Token prefix for looking for helper binary under $BINDIR
 	bindirPrefix = "$BINDIR"
 )
@@ -752,6 +757,22 @@ func readConfigFromFile(path string, config *Config) error {
 	return nil
 }
 
+// readConnectionFromFile reads the specified connection file at `path` and attempts to
+// unmarshal its content into a Connection.
+func readConnectionFromFile(path string, connection map[string]Destination) error {
+	logrus.Tracef("Reading connection file %q", path)
+	meta, err := toml.DecodeFile(path, &connection)
+	if err != nil {
+		return fmt.Errorf("decode connection %v: %w", path, err)
+	}
+	keys := meta.Undecoded()
+	if len(keys) > 0 {
+		logrus.Debugf("Failed to decode the keys %q from %q.", keys, path)
+	}
+
+	return nil
+}
+
 // addConfigs will search one level in the config dirPath for config files
 // If the dirPath does not exist, addConfigs will return nil
 func addConfigs(dirPath string, configs []string) ([]string, error) {
@@ -1181,16 +1202,25 @@ func resolveHomeDir(path string) (string, error) {
 }
 
 func rootlessConfigPath() (string, error) {
+	return rootlessPath(_configPath, UserOverrideContainersConfig)
+}
+
+func rootlessConnectionPath() (string, error) {
+	return rootlessPath(_connectionPath, UserOverrideContainersConnection)
+}
+
+func rootlessPath(path, override string) (string, error) {
 	if configHome := os.Getenv("XDG_CONFIG_HOME"); configHome != "" {
-		return filepath.Join(configHome, _configPath), nil
+		return filepath.Join(configHome, path), nil
 	}
 	home, err := unshare.HomeDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(home, UserOverrideContainersConfig), nil
+	return filepath.Join(home, override), nil
 }
+
 
 func stringsEq(a, b []string) bool {
 	if len(a) != len(b) {
@@ -1270,6 +1300,27 @@ func ReadCustomConfig() (*Config, error) {
 	return newConfig, nil
 }
 
+// ReadConnection reads the connection config
+func ReadConnection() (map[string]Destination, error) {
+	//ServiceDestinations map[string]Destination `toml:"service_destinations,omitempty"`
+	var newServiceDestinations map[string]Destination
+
+	path, err := ConnectionFile()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(path); err == nil {
+		if err := readConnectionFromFile(path, newServiceDestinations); err != nil {
+			return nil, err
+		}
+	} else {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	return newServiceDestinations, nil
+}
+
 // Write writes the configuration to the default file
 func (c *Config) Write() error {
 	var err error
@@ -1332,6 +1383,33 @@ func (c *Config) ActiveDestination() (uri, identity string, machine bool, err er
 		return c.Engine.RemoteURI, c.Engine.RemoteIdentity, false, nil
 	}
 	return "", "", false, errors.New("no service destination configured")
+}
+
+// WriteConnection writes the connection.conf file
+func (c *Config) WriteConnection() error {
+	var err error
+	path, err := ConnectionFile()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	opts := &ioutils.AtomicFileWriterOptions{ExplicitCommit: true}
+	connectionFile, err := ioutils.NewAtomicFileWriterWithOpts(path, 0o644, opts)
+	if err != nil {
+		return err
+	}
+	defer connectionFile.Close()
+
+	enc := toml.NewEncoder(connectionFile)
+	if err := enc.Encode(c.Engine.ServiceDestinations); err != nil {
+		return err
+	}
+
+	// If no errors commit the changes to the config file
+	return connectionFile.Commit()
 }
 
 var (

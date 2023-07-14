@@ -77,6 +77,11 @@ func inspect(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	con, err := config.ReadConnection()
+	if err != nil {
+		return err
+	}
+	cfg.Engine.ServiceDestinations = con
 
 	format := cmd.Flag("format").Value.String()
 	if format == "" && args != nil {
